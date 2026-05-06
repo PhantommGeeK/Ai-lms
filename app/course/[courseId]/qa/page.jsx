@@ -19,6 +19,13 @@ function ViewQA() {
     GetQA();
   }, [courseId]);
 
+  const getQuestions = (data) => {
+    if (Array.isArray(data?.content)) return data.content;
+    if (Array.isArray(data?.content?.questions)) return data.content.questions;
+    if (Array.isArray(data?.questions)) return data.questions;
+    return [];
+  };
+
   const GetQA = async () => {
     try {
       const result = await axios.post("/api/study-type", {
@@ -26,8 +33,7 @@ function ViewQA() {
         studyType: "Question/Answer",
       });
       console.log("QA DATA", result.data);
-      // Safely extract questions array
-      const questions = result.data?.content?.questions || result.data?.questions || [];
+      const questions = getQuestions(result.data);
       setQaData(questions);
     } catch (err) {
       console.error("Error fetching QA data:", err.message);

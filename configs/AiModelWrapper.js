@@ -2,11 +2,25 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Prefer a server-side API key variable but fall back to the public key if present.
 const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-const MODEL_FALLBACK = "gemini-3-flash-preview";
-const modelName = process.env.GEMINI_MODEL || process.env.NEXT_PUBLIC_GEMINI_MODEL || MODEL_FALLBACK;
-console.log(`[AiModelWrapper] Using model: ${modelName}`);
+const DEFAULT_MODEL = "gemini-3-flash-preview";
+const DEFAULT_FALLBACK_MODELS = [
+  "gemini-3.1-flash-lite-preview",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+];
+const modelName =
+  process.env.GEMINI_MODEL || process.env.NEXT_PUBLIC_GEMINI_MODEL || DEFAULT_MODEL;
+const fallbackModelNames = (
+  process.env.GEMINI_FALLBACK_MODELS || DEFAULT_FALLBACK_MODELS.join(",")
+)
+  .split(",")
+  .map((model) => model.trim())
+  .filter(Boolean)
+  .filter((model) => model !== modelName);
+const modelNames = [modelName, ...fallbackModelNames];
+console.log(`[AiModelWrapper] Using Gemini model order: ${modelNames.join(" -> ")}`);
 
 const generationConfig = {
   temperature: 1,
@@ -26,11 +40,36 @@ function extractRetryDelay(errorMsg) {
   return null;
 }
 
+function isRetryableError(errorMsg) {
+  return (
+    errorMsg.includes("429") ||
+    errorMsg.includes("503") ||
+    /quota|too many requests|rate limit|overloaded|high demand|service unavailable|fetch failed/i.test(
+      errorMsg
+    )
+  );
+}
+
+function shouldTryFallbackSoon(errorMsg) {
+  return /503|overloaded|high demand|service unavailable|fetch failed/i.test(errorMsg);
+}
+
+function retryDelayForAttempt(errorMsg, attempt) {
+  return extractRetryDelay(errorMsg) || 1000 * Math.pow(2, attempt);
+}
+
 function makeLazyChat(initialHistory = []) {
   let chat = null;
+  let activeModelName = modelNames[0];
 
-  function resetChat() {
-    const gm = genAI.getGenerativeModel({ model: modelName });
+  function resetChat(nextModelName = activeModelName) {
+    if (!genAI) {
+      throw new Error(
+        "Gemini API key missing. Set GEMINI_API_KEY or NEXT_PUBLIC_GEMINI_API_KEY."
+      );
+    }
+    activeModelName = nextModelName;
+    const gm = genAI.getGenerativeModel({ model: activeModelName });
     chat = gm.startChat({ generationConfig, history: initialHistory });
   }
 
@@ -38,30 +77,46 @@ function makeLazyChat(initialHistory = []) {
     async sendMessage(message, maxRetries = 3) {
       if (!chat) resetChat();
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          return await chat.sendMessage(message);
-        } catch (e) {
-          const msg = (e && e.message) || String(e);
-          const is429 = msg.includes("429") || msg.includes("quota") || msg.includes("Too Many Requests");
+      for (const currentModelName of modelNames) {
+        resetChat(currentModelName);
 
-          if (is429 && attempt < maxRetries) {
-            // Extract delay from error message, or use exponential backoff
-            const retryDelay = extractRetryDelay(msg) || (2000 * Math.pow(2, attempt));
-            console.warn(
-              `[AiModelWrapper] Rate limited (429) on attempt ${attempt + 1}/${maxRetries + 1}. ` +
-              `Waiting ${retryDelay}ms before retry...`
-            );
-            await sleep(retryDelay);
-            // Reset chat since the previous session may be invalidated
-            resetChat();
-            continue;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            return await chat.sendMessage(message);
+          } catch (e) {
+            const msg = (e && e.message) || String(e);
+            const isRetryable = isRetryableError(msg);
+            const hasFallback = currentModelName !== modelNames[modelNames.length - 1];
+            const retryLimit = shouldTryFallbackSoon(msg) && hasFallback ? 1 : maxRetries;
+            const canRetrySameModel = isRetryable && attempt < retryLimit;
+
+            if (canRetrySameModel) {
+              const retryDelay = retryDelayForAttempt(msg, attempt);
+              console.warn(
+                `[AiModelWrapper] ${activeModelName} failed with a retryable error ` +
+                  `on attempt ${attempt + 1}/${maxRetries + 1}. ` +
+                  `Waiting ${retryDelay}ms before retry...`
+              );
+              await sleep(retryDelay);
+              resetChat();
+              continue;
+            }
+
+            const canTryFallback = isRetryable && hasFallback;
+
+            if (canTryFallback) {
+              console.warn(
+                `[AiModelWrapper] ${activeModelName} is unavailable. Trying fallback model...`
+              );
+              break;
+            }
+
+            throw e;
           }
-
-          // For non-429 errors or final attempt, throw
-          throw e;
         }
       }
+
+      throw new Error("All configured Gemini models failed to generate content.");
     },
   };
 }

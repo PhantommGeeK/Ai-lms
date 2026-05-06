@@ -74,6 +74,16 @@ function Create() {
       <div className="absolute bottom-0 right-1/3 w-[300px] h-[300px] rounded-full bg-blue-600/5 blur-[100px] pointer-events-none" />
 
       <div className="relative z-10 w-full max-w-3xl mt-10">
+        <button
+          type="button"
+          className="outline-btn mb-8 flex items-center gap-2 text-sm text-text-primary bg-dark-tertiary/80 border-white/10"
+          onClick={() => router.push("/dashboard")}
+          disabled={loading}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Dashboard
+        </button>
+
         {/* Header */}
         <div className="text-center mb-10 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 glass-card-static px-4 py-1.5 mb-5">

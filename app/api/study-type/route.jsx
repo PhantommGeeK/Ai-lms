@@ -4,6 +4,37 @@ import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { STUDY_TYPE_CONTENT_TABLE } from "../../../configs/schema";
 
+function normalizeContentRecord(record) {
+  if (!record?.content) {
+    return record || null;
+  }
+
+  if (
+    (record.type === "Quiz" || record.type === "Question/Answer") &&
+    Array.isArray(record.content)
+  ) {
+    return {
+      ...record,
+      content: {
+        questions: record.content,
+      },
+    };
+  }
+
+  if (record.type === "Flashcard" && !Array.isArray(record.content)) {
+    return {
+      ...record,
+      content:
+        record.content.flashcards ||
+        record.content.cards ||
+        record.content.content ||
+        [],
+    };
+  }
+
+  return record;
+}
+
 // Helper function to retry database operations
 async function retryDbOperation(operation, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
@@ -84,7 +115,13 @@ export async function POST(req) {
 
       console.log(`Content for type ${studyType}:`, result);
 
-      return NextResponse.json(result[0] || null);
+      const readyRecord =
+        result.find((item) => item.status === "Ready" && item.content) ||
+        result.find((item) => item.content) ||
+        result[0] ||
+        null;
+
+      return NextResponse.json(normalizeContentRecord(readyRecord));
     }
   } catch (error) {
     console.error("Error in POST /api/study-type:", error.message);

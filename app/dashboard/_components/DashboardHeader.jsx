@@ -1,6 +1,6 @@
 "use client"
 import { UserButton } from '@clerk/nextjs'
-import { Bell, Search } from 'lucide-react'
+import { ArrowLeft, Bell, Search } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -9,6 +9,26 @@ function DashboardHeader() {
   const [searchValue, setSearchValue] = useState("");
   const router = useRouter();
   const pathname = usePathname();
+  const showBackButton = pathname !== "/" && pathname !== "/dashboard";
+
+  const getFallbackPath = () => {
+    const courseMatch = pathname?.match(/^\/course\/([^/]+)(?:\/.+)?$/);
+
+    if (courseMatch && pathname !== `/course/${courseMatch[1]}`) {
+      return `/course/${courseMatch[1]}`;
+    }
+
+    return "/dashboard";
+  };
+
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push(getFallbackPath());
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -39,8 +59,20 @@ function DashboardHeader() {
   return (
     <div className='header-bar px-6 py-3 flex items-center justify-between sticky top-0 z-30'>
       {/* Left side - Page Title */}
-      <div>
-        <h1 className="text-lg font-semibold text-text-primary">Dashboard Overview</h1>
+      <div className="flex items-center gap-3 min-w-0">
+        {showBackButton && (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="outline-btn flex items-center gap-2 px-3 py-2 text-text-primary bg-dark-tertiary/80 border-white/10"
+            aria-label="Go back"
+            title="Go back"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+        )}
+        <h1 className="text-lg font-semibold text-text-primary truncate">Dashboard Overview</h1>
       </div>
 
       {/* Center - Search */}

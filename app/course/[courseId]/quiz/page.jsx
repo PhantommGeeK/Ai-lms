@@ -21,6 +21,13 @@ function GamifiedQuiz() {
     GetQuiz();
   }, []);
 
+  const getQuestions = (data) => {
+    if (Array.isArray(data?.content)) return data.content;
+    if (Array.isArray(data?.content?.questions)) return data.content.questions;
+    if (Array.isArray(data?.questions)) return data.questions;
+    return [];
+  };
+
   useEffect(() => {
     if (timer > 0 && selectedOption === null && !quizCompleted) {
       const countdown = setInterval(() => setTimer((t) => t - 1), 1000);
@@ -37,7 +44,7 @@ function GamifiedQuiz() {
         studyType: "Quiz",
       });
       setQuizData(result.data);
-      const questions = result.data?.content?.questions || [];
+      const questions = getQuestions(result.data);
       setSelectedOptions(Array(questions.length).fill(null));
       setLoading(false);
     } catch (error) {
@@ -48,7 +55,7 @@ function GamifiedQuiz() {
 
   const handleOptionClick = (option) => {
     setSelectedOption(option);
-    const correctAnswer = quizData.content.questions[stepCount].answer;
+    const correctAnswer = getQuestions(quizData)[stepCount].answer;
     const isAnswerCorrect = option === correctAnswer;
     setIsCorrect(isAnswerCorrect);
     if (isAnswerCorrect) {
@@ -80,19 +87,20 @@ function GamifiedQuiz() {
       const prevOption = selectedOptions[stepCount - 1];
       setSelectedOption(prevOption);
       setIsCorrect(
-        prevOption === quizData.content.questions[stepCount - 1].answer
+        prevOption === getQuestions(quizData)[stepCount - 1].answer
       );
     }
   };
 
   const nextStep = () => {
-    if (quizData && quizData.content.questions.length > stepCount + 1) {
+    const questions = getQuestions(quizData);
+    if (quizData && questions.length > stepCount + 1) {
       setStepCount((prev) => prev + 1);
       resetSelection();
       const nextOption = selectedOptions[stepCount + 1];
       setSelectedOption(nextOption);
       setIsCorrect(
-        nextOption === quizData.content.questions[stepCount + 1].answer
+        nextOption === questions[stepCount + 1].answer
       );
     } else {
       setQuizCompleted(true);
@@ -102,7 +110,7 @@ function GamifiedQuiz() {
   const restartQuiz = () => {
     setStepCount(0);
     setScore(0);
-    setSelectedOptions(Array(quizData.content.questions.length).fill(null));
+    setSelectedOptions(Array(getQuestions(quizData).length).fill(null));
     setQuizCompleted(false);
     resetSelection();
   };
@@ -120,7 +128,10 @@ function GamifiedQuiz() {
     );
   }
 
-  if (!quizData || !quizData.content || !quizData.content.questions?.length) {
+  const questions = getQuestions(quizData);
+  const quizTitle = quizData?.content?.quizTitle || quizData?.quizTitle;
+
+  if (!questions.length) {
     return (
       <div className="glass-card-static p-8 text-center">
         <Zap className="w-12 h-12 text-text-muted mx-auto mb-3" />
@@ -128,8 +139,6 @@ function GamifiedQuiz() {
       </div>
     );
   }
-
-  const { questions, quizTitle } = quizData.content;
 
   if (quizCompleted) {
     const percentage = Math.round((score / (questions.length * 10)) * 100);

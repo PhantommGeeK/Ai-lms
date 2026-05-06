@@ -11,7 +11,7 @@ import {
   GenerateQaAiModel,
   GenerateQuizAiModel,
   GenerateStudyTypeContentAiModel,
-} from "../configs/AiModel";
+} from "../configs/AiModelWrapper";
 import { eq } from "drizzle-orm";
 
 // Helper to safely parse AI JSON responses
@@ -47,8 +47,7 @@ function safeParseJSON(text) {
 
 // Function to test the "hello-world" event
 export const helloWorld = inngest.createFunction(
-  { id: "hello-world" },
-  { event: "test/hello.world" },
+  { id: "hello-world", triggers: { event: "test/hello.world" } },
   async ({ event, step }) => {
     await step.sleep("wait-a-moment", "1s");
     return { message: `Hello ${event.data.email}!` };
@@ -57,8 +56,7 @@ export const helloWorld = inngest.createFunction(
 
 // Function to create a new user if they don't already exist
 export const CreateNewUser = inngest.createFunction(
-  { id: "create-user" },
-  { event: "user.create" },
+  { id: "create-user", triggers: { event: "user.create" } },
   async ({ event, step }) => {
     const user = event.data?.user || event.data;
 
@@ -93,8 +91,7 @@ export const CreateNewUser = inngest.createFunction(
 
 // Function to generate notes for chapters in a course
 export const GenerateNotes = inngest.createFunction(
-  { id: "generate-course" },
-  { event: "notes.generate" },
+  { id: "generate-course", triggers: { event: "notes.generate" } },
   async ({ event, step }) => {
     const { course } = event.data;
 
@@ -208,8 +205,7 @@ Give me in .md format
 );
 
 export const GenerateStudyTypeContent = inngest.createFunction(
-  { id: "Generate Study Type Content" },
-  { event: "studyType.content" },
+  { id: "Generate Study Type Content", triggers: { event: "studyType.content" } },
   async ({ event, step }) => {
     const { studyType, prompt, courseId, recordId } = event.data;
     const AIResult = await step.run(
