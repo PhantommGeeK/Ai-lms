@@ -1,10 +1,40 @@
 "use client"
 import { UserButton } from '@clerk/nextjs'
 import { Bell, Search } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation';
 
 function DashboardHeader() {
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setSearchValue(params.get("q") || "");
+  }, [pathname]);
+
+  const handleSearchChange = (event) => {
+    const nextValue = event.target.value;
+    setSearchValue(nextValue);
+
+    const params = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : ""
+    );
+
+    if (nextValue.trim()) {
+      params.set("q", nextValue);
+    } else {
+      params.delete("q");
+    }
+
+    const targetPath = pathname?.startsWith("/dashboard") ? pathname : "/dashboard";
+    const queryString = params.toString();
+    router.replace(queryString ? `${targetPath}?${queryString}` : targetPath);
+    window.dispatchEvent(new CustomEvent("dashboard-search-change", { detail: nextValue }));
+  };
 
   return (
     <div className='header-bar px-6 py-3 flex items-center justify-between sticky top-0 z-30'>
@@ -20,6 +50,8 @@ function DashboardHeader() {
           type="text"
           placeholder="Search courses, topics, materials..."
           className="search-input"
+          value={searchValue}
+          onChange={handleSearchChange}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
         />

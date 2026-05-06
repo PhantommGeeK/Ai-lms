@@ -20,8 +20,7 @@ function SideBar() {
     {
       name: 'Courses',
       icon: BookOpen,
-      path: '/dashboard',
-      section: true,
+      path: '/dashboard/courses',
     },
     {
       name: 'MathAI',
@@ -31,8 +30,7 @@ function SideBar() {
     {
       name: 'Discussions',
       icon: MessageSquare,
-      path: '/dashboard',
-      section: true,
+      path: '/dashboard/discussions',
     },
     {
       name: 'Certificates',
@@ -84,7 +82,7 @@ function SideBar() {
           <Link key={index} href={menu.path}>
             <div
               className={`sidebar-item ${collapsed ? 'justify-center px-3' : ''} ${
-                path === menu.path && !menu.section ? 'active' : ''
+                path === menu.path ? 'active' : ''
               }`}
               title={collapsed ? menu.name : undefined}
             >

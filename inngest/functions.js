@@ -60,7 +60,7 @@ export const CreateNewUser = inngest.createFunction(
   { id: "create-user" },
   { event: "user.create" },
   async ({ event, step }) => {
-    const [user] = event.data;
+    const user = event.data?.user || event.data;
 
     const result = await step.run(
       "Check User and Create if Not in DB",
@@ -71,12 +71,12 @@ export const CreateNewUser = inngest.createFunction(
           .from(USER_TABLE)
           .where(eq(USER_TABLE.email, user?.primaryEmailAddress?.emailAddress));
 
-        if (existingUser.length === 0) {
+        if (existingUser.length === 0 && user?.primaryEmailAddress?.emailAddress) {
           // Insert the new user if not found
           const newUser = await db
             .insert(USER_TABLE)
             .values({
-              name: user?.fullName,
+              name: user?.fullName || user?.firstName || "User",
               email: user?.primaryEmailAddress?.emailAddress,
             })
             .returning({ id: USER_TABLE.id });

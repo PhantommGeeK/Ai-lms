@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react'
+import React, { Suspense } from 'react'
 import SideBar from './_components/SideBar'
 import DashboardHeader from './_components/DashboardHeader'
 
@@ -14,7 +14,9 @@ function DashboardLayout({ children }) {
       
       {/* Main Content */}
       <div className='flex-1 md:ml-64 transition-all duration-300'>
-        <DashboardHeader />
+        <Suspense fallback={<div className='header-bar px-6 py-3 sticky top-0 z-30' />}>
+          <DashboardHeader />
+        </Suspense>
         <div className='p-6 lg:p-8'>
           {children}
         </div>

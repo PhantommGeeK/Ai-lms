@@ -43,7 +43,7 @@ function CourseCardItem({ course, onDelete }) {
             </div>
           ) : (
             <>
-              <Link href={`course/${course.courseId}`}>
+              <Link href={`/course/${course.courseId}`}>
                 <button className="gradient-btn text-xs px-4 py-2 flex items-center gap-1.5 group-hover:shadow-glow transition-shadow">
                   <span>View</span>
                   <ArrowRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />

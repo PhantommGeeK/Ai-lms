@@ -6,12 +6,14 @@ import axios from "axios";
 import CourseCardItem from "./CourseCardItem";
 import { BookOpen, FolderOpen } from "lucide-react";
 import Link from "next/link";
+import { getCourseSummary, getCourseTitle } from "../../utils/courseHelpers";
 
 function CourseList() {
   const { user } = useUser();
   const [courseList, setCourseList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [query, setQuery] = useState("");
 
   const GetCourseList = async () => {
     try {
@@ -53,6 +55,35 @@ function CourseList() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncQueryFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      setQuery((params.get("q") || "").trim().toLowerCase());
+    };
+
+    syncQueryFromUrl();
+    window.addEventListener("popstate", syncQueryFromUrl);
+    window.addEventListener("dashboard-search-change", syncQueryFromUrl);
+
+    return () => {
+      window.removeEventListener("popstate", syncQueryFromUrl);
+      window.removeEventListener("dashboard-search-change", syncQueryFromUrl);
+    };
+  }, []);
+
+  const filteredCourseList = courseList.filter((course) => {
+    if (!query) return true;
+
+    const title = getCourseTitle(course.courseLayout, course.topic || "").toLowerCase();
+    const summary = getCourseSummary(course.courseLayout).toLowerCase();
+    const topic = (course.topic || "").toLowerCase();
+    const courseType = (course.courseType || "").toLowerCase();
+
+    return [title, summary, topic, courseType].some((value) => value.includes(query));
+  });
+
   if (loading) {
     return (
       <div className="mt-10">
@@ -89,22 +120,30 @@ function CourseList() {
           Your Study Material
         </h2>
         <span className="text-xs text-text-muted bg-dark-tertiary px-3 py-1 rounded-full">
-          {courseList.length} {courseList.length === 1 ? 'course' : 'courses'}
+          {filteredCourseList.length} {filteredCourseList.length === 1 ? 'course' : 'courses'}
         </span>
       </div>
 
-      {courseList.length === 0 ? (
+      {filteredCourseList.length === 0 ? (
         <div className="glass-card-static p-12 text-center">
           <FolderOpen className="w-12 h-12 text-text-muted mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-text-primary mb-1">No courses yet</h3>
-          <p className="text-sm text-text-secondary mb-5">Create your first AI-powered study material</p>
-          <Link href="/create">
-            <button className="gradient-btn">Create Course</button>
-          </Link>
+          <h3 className="text-lg font-semibold text-text-primary mb-1">
+            {query ? "No courses match your search" : "No courses yet"}
+          </h3>
+          <p className="text-sm text-text-secondary mb-5">
+            {query
+              ? "Try a different title, topic, or material keyword."
+              : "Create your first AI-powered study material"}
+          </p>
+          {!query && (
+            <Link href="/create">
+              <button className="gradient-btn">Create Course</button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {courseList.map((course, index) => (
+          {filteredCourseList.map((course, index) => (
             <CourseCardItem
               course={course}
               key={index}

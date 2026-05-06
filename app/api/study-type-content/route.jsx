@@ -1,7 +1,35 @@
 import { STUDY_TYPE_CONTENT_TABLE } from "../../../configs/schema";
 import { db } from "../../../configs/db";
+import { eq } from "drizzle-orm";
 import { inngest } from "../../../inngest/client";
+import {
+  GenerateQaAiModel,
+  GenerateQuizAiModel,
+  GenerateStudyTypeContentAiModel,
+} from "../../../configs/AiModelWrapper";
 import { NextResponse } from "next/server";
+
+function safeParseJSON(text) {
+  let cleaned = text.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned
+      .replace(/^```(?:json)?\s*\n?/, "")
+      .replace(/\n?```\s*$/, "");
+  }
+
+  return JSON.parse(cleaned);
+}
+
+async function generateContentLocally(type, prompt) {
+  const result =
+    type === "Flashcard"
+      ? await GenerateStudyTypeContentAiModel.sendMessage(prompt)
+      : type === "Quiz"
+      ? await GenerateQuizAiModel.sendMessage(prompt)
+      : await GenerateQaAiModel.sendMessage(prompt);
+
+  return safeParseJSON(result.response.text());
+}
 
 export async function POST(req) {
   try {
@@ -138,16 +166,32 @@ Give me in .md format
 
     console.log("Inserted Content ID:", result);
 
-    // Trigger the external task
-    await inngest.send({
-      name: "studyType.content",
-      data: {
-        studyType: type,
-        prompt: PROMPT,
-        courseId: courseId,
-        recordId: result[0]?.id,
-      },
-    });
+    try {
+      await inngest.send({
+        name: "studyType.content",
+        data: {
+          studyType: type,
+          prompt: PROMPT,
+          courseId: courseId,
+          recordId: result[0]?.id,
+        },
+      });
+    } catch (inngestError) {
+      console.log(
+        "Inngest unavailable, generating study content inline:",
+        inngestError.message
+      );
+
+      const content = await generateContentLocally(type, PROMPT);
+
+      await db
+        .update(STUDY_TYPE_CONTENT_TABLE)
+        .set({
+          content,
+          status: "Ready",
+        })
+        .where(eq(STUDY_TYPE_CONTENT_TABLE.id, result[0]?.id));
+    }
 
     return NextResponse.json({ id: result[0]?.id });
   } catch (error) {
